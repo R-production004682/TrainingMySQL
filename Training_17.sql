@@ -23,3 +23,4 @@ select coalesce(test_score_1 , test_score_2 , test_score_3),
  test_score_1 , test_score_2 , test_score_3 as score from tests_score limit 10;
 
  select substring("apple" , 3);
+ 
