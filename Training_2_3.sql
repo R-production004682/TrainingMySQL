@@ -38,3 +38,24 @@ union
 select age,name from users where id < 10
 ORDER BY age;
 
+#intersect: 重複を表示
+#new_studentsに存在していて、studentsに存在しているものを抽出する。
+select * from new_students
+intersect
+select * from students;
+
+
+#EXCEPT: 重複以外を表示
+#new_studentsに存在していて、studentsに存在しない。
+select * from new_students
+except
+select * from students;
+
+#どちらかに存在(EXCEPT)
+select * from new_students
+except
+select * from students
+union all
+select * from students
+except
+select * from new_students;
