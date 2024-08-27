@@ -30,3 +30,33 @@ select cs.id, cs.first_Name, cs.last_Name,
 (select sum(order_amount * order_price) from orders as tmp_order where cs.id = tmp_order.customer_id) as "全支払い金額"  # 顧客ごとの総支払い金額
 from customers as cs
 where cs.id < 10;  # 顧客IDが10未満の顧客情報を取得
+
+# 副問い合わせ6: CASEと使う
+-- 「経営企画部」の従業員は「経営層」、それ以外は「その他」と表示
+select emp.*,
+  case 
+    when emp.department_id = (
+      -- 部署名が「経営企画部」の部署IDを取得
+      select id from departments where name = "経営企画部"
+    ) 
+    then "経営層"  -- 経営企画部に所属している場合
+    else "その他"   -- その他の部署に所属している場合
+  end as "役割"
+from employees as emp;
+
+-- 給料が平均より高いかどうかを判定するクエリ
+select emp.*,
+  case
+    when emp.id in (
+      -- 給料が平均より高い従業員IDを取得
+      select distinct employee_id 
+      from salaries 
+      where payment > (
+        -- 給料の平均値を計算
+        select avg(payment) from salaries
+      )
+    )
+    then "○"  -- 給料が平均より高い場合
+    else "×"  -- 給料が平均以下の場合
+  end as "給料が平均より高いか"
+from employees emp;
