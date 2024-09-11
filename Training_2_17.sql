@@ -29,3 +29,50 @@ inner join salaries as sa
 on emp.id = sa.employee_id limit 30;
 
 
+-- ordersテーブルから、order_price * order_amountの合計を日ごとに集計し、7日間の平均を計算する
+-- 日ごとの合計金額（売上）を取得
+with daily_summary as(
+    select
+        order_date, sum(order_price * order_amount) as sale
+    from
+        orders
+    group by order_date
+)
+-- 6行前から現在の行までの売上の移動平均を計算する（行数ベース）
+-- 過去6日間から当日までの売上の平均
+-- 日付範囲に基づく1週間前から現在までの売上の平均を計算する（日付ベース）
+select *, 
+avg(sale) over (order by order_date rows between 6 preceding and current row) as 6行前から現在の行までの平均,
+avg(sale) over (order by order_date range between interval 7 day preceding and current row) as 1週間内の平均
+from daily_summary limit 10;
+
+-- 社員の年齢ごとに支払いの合計を計算し、全期間の支払合計と最大支払額を求める
+select *, 
+sum(summary_salary.payment) 
+over(order by age range between unbounded preceding and unbounded following) as 全期間の支払合計
+from employees as emp 
+inner join(
+    -- 各社員の支払い総額を計算するために、salariesテーブルを集計
+    select employee_id , sum(payment) as payment
+    from salaries 
+    group by employee_id
+) as summary_salary
+on emp.id = summary_salary.employee_id limit 10;
+
+
+-- 前後1年の給料増減率を計算
+select emp.*, 
+lag(summary_salary.payment, 1) over(order by emp.age) as 前年の支払額,
+lead(summary_salary.payment, 1) over(order by emp.age) as 来年の支払額,
+(case 
+    when lag(summary_salary.payment, 1) over(order by emp.age) is not null 
+    then (summary_salary.payment - lag(summary_salary.payment, 1) over(order by emp.age)) / lag(summary_salary.payment, 1) over(order by emp.age)
+    else null
+end) as 支払増減率
+from employees as emp 
+inner join (
+    select employee_id, sum(payment) as payment
+    from salaries 
+    group by employee_id
+) as summary_salary
+on emp.id = summary_salary.employee_id limit 10;
