@@ -22,3 +22,17 @@ lag(age, 3, 0) over(order by age) as third_prev_age, -- 3つ前の行の値を�
 lead(age) over(order by age) as next_age, -- 直後の行の値を取得
 lead(age, 2, 0) over(order by age) as second_next_age -- 2つ後の行の値を取得、ない場合は0を返す
 from customers;
+
+-- FIRST_VALUE, LAST_VALUE
+select *,
+first_value(first_name) over(partition by department_id order by age) ,
+last_value(first_name) over(partition by department_id order by age
+range between unbounded preceding and unbounded following) 
+from employees;
+
+-- NTILE
+select * from 
+(select age,
+NTILE(10) over(order by age) as ntile_value
+from employees) as tmp
+where tmp.ntile_value = 8;
