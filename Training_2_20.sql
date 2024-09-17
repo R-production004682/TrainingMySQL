@@ -33,3 +33,27 @@ where department_id in
     -- "開発部" 部署に該当するIDを取得
     select id from departments where name = "開発部"
 );
+
+-- SELECTを用いたINSERT
+select * from customers limit 10;
+select * from orders limit 10;
+
+create table customer_orders
+(
+    name VARCHAR(255),
+    order_date DATE,
+    sales INT,
+    total_sales INT
+);
+
+insert into customer_orders
+select 
+    concat(ct.last_name, ct.first_name) as 名前,
+    od.order_date as 購入日,
+    od.order_amount * od.order_price as 購入した金額,
+    sum(od.order_amount * od.order_price) over (partition by concat(ct.last_name, ct.first_name) order by od.order_date) as 合計金額
+from customers as ct
+inner join orders as od 
+on ct.id = od.customer_id limit 30;
+
+select * from customer_orders;
