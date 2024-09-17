@@ -76,3 +76,4 @@ inner join (
     group by employee_id
 ) as summary_salary
 on emp.id = summary_salary.employee_id limit 10;
+
