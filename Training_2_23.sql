@@ -73,3 +73,81 @@ select * from employees;
 insert into salaries (id, company_id, employee_code, payment, paid_date)
 values
     (1, 1, "00000003", 1000, "2020-01-01");
+
+
+use my_db3;
+
+drop table students;
+
+-- on delete, on update追加
+create table students
+(
+    id int primary key,
+    name varchar(255),
+    age int,
+    school_id int,
+    foreign key(school_id) references schools(id)
+    on delete cascade on update cascade
+);
+
+insert into students (id, name, age, school_id)
+values
+    (1, "Taro", 18, 1);
+
+select * from students;
+select * from schools;
+
+update schools set id = 3 where id = 1;
+
+delete from schools;
+drop table students;
+
+-- on delete, on update追加(set null)
+create table students
+(
+    id int primary key,
+    name varchar(255),
+    age int,
+    school_id int,
+    foreign key(school_id) references schools(id)
+    on delete cascade on update cascade set null
+);
+
+insert into schools (id, name)
+values
+    (2 , "南高校");
+
+insert into students (id, name, age, school_id)
+values
+    (2, "Taro", 16, 2);
+
+select * from students;
+
+update schools set id = 3 where id = 1;
+update students set school_id = 3 where school_id is null;
+
+select * from schools;
+delete from schools where id = 3;
+
+drop table students;
+
+-- on delete, on update追加（set default）
+create table students
+(
+    id int primary key,
+    name varchar(255),
+    age int,
+    school_id int default -1,
+    foreign key(school_id) references schools(id)
+    on delete set default on update
+);
+
+select * from schools;
+
+insert into schools values(1 , "北高校");
+
+insert into students values(1, "Taro", 17, 1);
+
+select * from students;
+
+update schools set id = 3 where id = 1;
