@@ -45,3 +45,6 @@ values
 
  -- テーブルの作成文を表示（テーブルの詳細構造を確認するため）
 show create table employees\G
+
+
+
