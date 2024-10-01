@@ -130,6 +130,7 @@ values
 
 select  * from alarms;
 update alarms set alarm_time = current_timestamp where id = 1;
+select * from alarms;
 
 select hour(alarm_time), alarm_time from alarms; -- 時のみ抽出
 select minute(alarm_time), alarm_time from alarms; -- 分のみ抽出
@@ -146,6 +147,73 @@ insert into tmp_time values("21:05:21.54321");
 
 select * from tmp_time;
 
+
+-- DATETIME, TIMESTAMP
+create table tmp_datetime_timestamp
+(
+    val_datetime datetime,
+    val_timestamp timestamp,
+    val_datetime_3 datetime(3),
+    val_timestamp_3 timestamp(3)
+);
+
+-- データ挿入、エラーを引き起こす例を含む
+insert into tmp_datetime_timestamp (val_datetime, val_timestamp, val_datetime_3, val_timestamp_3)
+values
+    (current_timestamp, current_timestamp, current_timestamp, current_timestamp), 
+    ("2000/01/01 09:08:07.5432", "2000/01/01 09:08:07.5432", "2000/01/01 09:08:07.6578", "2000/01/01 09:08:07.6578");
+    -- timestamp型は、9999年まで入れられるが、timestamp型は、2038年問題の都合上2037/12/31までしか入れられない。
+    -- ("2039/01/01 00:00:01", "2039/01/01 00:00:01", "2039/01/01 00:00:01.123", "2039/01/01 00:00:01.123"),
+    -- 古いデータを挿入しようとするとエラーが発生
+    -- ("1969/01/01 00:00:01", "1969/01/01 00:00:01", "1969/01/01 00:00:01", "1969/01/01 00:00:01"); -- エラー例
+
+-- 別の形式でのデータ挿入
+insert into tmp_datetime_timestamp (val_datetime, val_timestamp, val_datetime_3, val_timestamp_3)
+values
+    (now(), now(), now(3), now(3)), 
+    ("2022-12-31 23:59:59", "2022-12-31 23:59:59", "2022-12-31 23:59:59.999", "2022-12-31 23:59:59.999");
+
+-- すべてのデータを取得
+select * from tmp_datetime_timestamp;
+
+-- 特定のカラムのみ取得
+select val_datetime, val_timestamp from tmp_datetime_timestamp;
+
+-- datetimeの範囲指定でデータを取得
+select * from tmp_datetime_timestamp
+where val_datetime between '2020-01-01 00:00:00' and '2023-12-31 23:59:59';
+
+-- ミリ秒単位のtimestampをフィルタリング
+select * from tmp_datetime_timestamp
+where val_timestamp_3 like '2000-01-01%';
+
+select * from tmp_datetime_timestamp;
+
+
+use my_db3;
+
+-- ユーザー予約情報テーブルの作成
+CREATE TABLE reservations (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,               -- ユーザーID
+    reservation_at DATETIME NOT NULL,   -- 予約日時
+    create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,   -- レコード作成日時
+    update_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP  -- 更新日時
+);
+
+-- パフォーマンスを考慮し、予約日時にインデックスを設定
+CREATE INDEX idx_reservation_at ON reservations(reservation_at);
+
+-- 1週間以内の予約を取得するクエリ
+SELECT * FROM reservations
+WHERE reservation_at BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY);
+
+-- クエリの実行プランを確認
+EXPLAIN SELECT * FROM reservations
+WHERE reservation_at BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 7 DAY)\G
+
+
+
 -- 最後にテーブルを削除
 DROP TABLE messages;
 DROP TABLE patients;
@@ -154,3 +222,5 @@ DROP TABLE tmp_double;
 DROP TABLE tmp_decimal;
 DROP TABLE managers;
 DROP TABLE alarms;
+DROP TABLE tmp_time;
+DROP TABLE tmp_datetime_timestamp;
