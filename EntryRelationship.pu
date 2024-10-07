@@ -1,0 +1,48 @@
+@startuml EntityRelationship
+
+package "my_db3" as target_system <<Database>> {
+
+    entity "users" as users {
+        + id [PK] [UN]
+        --
+        name
+        password
+        email
+        profile_image
+        bio 
+        created_at
+        updated_at
+    }
+
+    entity "tweets" as tweets {
+        + id [PK] [UN]
+        --
+        message
+        user_id [FK]  -- references users(id)
+        created_at
+        updated_at
+    }
+
+    entity "likes" as likes {
+        + user_id [PK] [FK] -- references users(id)
+        + tweet_id [PK] [FK] -- references tweets(id)
+        --
+        created_at
+        updated_at
+    }
+
+    entity "follows" as follows {
+        + follower_id [PK] [FK] -- references users(id)
+        + followee_id [PK] [FK] -- references users(id)
+        --
+        created_at
+        updated_at
+    }
+
+    users ||--o{ tweets : "has"
+    users ||--o{ likes : "likes"
+    tweets ||--o{ likes : "is liked by"
+    users ||--o{ follows : "is followed by"
+    users ||--o{ follows : "follows"
+}
+@enduml
