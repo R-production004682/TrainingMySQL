@@ -115,3 +115,113 @@ explain analyze select * from customers where first_name = "Olivia" or age = 42;
 
 -- OR条件のクエリでは、複合インデックスが活用されず、テーブルスキャンが発生することが多い。
 */
+
+-- まず、インデックスなしの状態で、ORDER BYを使ったクエリのパフォーマンスを検証。
+-- インデックスがないため、テーブル全体をスキャンし、ソートが行われている。
+drop index idx_customers_first_name_age on customers;
+explain analyze select * from customers order by first_name;
+/*
+    -> Sort: customers.first_name  (cost=200 rows=1971)
+        (actual time=1.45..1.62 rows=2000 loops=1)
+    -> Table scan on customers  (cost=200 rows=1971)
+        (actual time=0.0484..0.736 rows=2000 loops=1)
+    -- テーブルスキャン後にソートが実行されており、2000行の処理に約1.62秒かかっている。
+    -- ソートコストが高く、最適化の余地がある。
+*/
+
+-- first_nameに対してインデックスを追加。
+-- しかし、ソート処理が依然として発生し、パフォーマンスの改善はあまり見られない。
+create index idx_customers_first_name on customers(first_name);
+explain analyze select * from customers order by first_name;
+/*
+    -> Sort: customers.first_name  (cost=200 rows=1971)
+        (actual time=2.62..2.89 rows=2000 loops=1)
+    -> Table scan on customers  (cost=200 rows=1971)
+        (actual time=0.0727..1.35 rows=2000 loops=1)
+    -- インデックスが追加されたが、テーブルスキャンが発生しており、ソートのために時間がかかっている。
+    -- 実行時間がむしろ増えていることから、ORDER BYに対するインデックスの効果が限定的であることがわかる。
+*/
+
+-- GROUP BYで集計する場合、first_nameにインデックスを張ることでパフォーマンスを向上できるかを検証。
+-- インデックスを活用して、集計処理が高速化されている。
+explain analyze select first_name , count(*) from customers group by first_name;
+/*
+    -> Group aggregate: count(0)  (cost=397 rows=468)
+        (actual time=0.185..1.34 rows=468 loops=1)
+    -> Covering index scan on customers using idx_customers_first_name  (cost=200 rows=1971)
+        (actual time=0.165..0.93 rows=2000 loops=1)
+    -- first_nameに対するインデックスが利用され、インデックススキャンを活用している。
+    -- パフォーマンスは約1.34秒と改善されたが、さらなる最適化の余地がある。
+*/
+
+-- 今度はageに対してインデックスを作成し、GROUP BYのパフォーマンスを確認。
+create index idx_customers_age on customers(age);
+explain analyze select age , count(*) from customers group by age;
+/*
+    -> Group aggregate: count(0)  (cost=397 rows=49)
+        (actual time=0.0796..0.78 rows=49 loops=1)
+    -> Covering index scan on customers using idx_customers_age  (cost=200 rows=1971)
+        (actual time=0.0599..0.643 rows=2000 loops=1)
+    -- ageに対してインデックスを張った結果、GROUP BYの集計処理が約0.78秒に短縮された。
+    -- 複数カラムでのインデックスを使えば、さらに効率化が期待できる。
+*/
+
+-- first_nameとageの複合インデックスを作成し、GROUP BYを複数カラムに対して実施。
+drop index idx_customers_first_name on customers;
+drop index idx_customers_age on customers;
+
+-- 複合インデックスでの最適化を試す。
+create index idx_customers_first_name_age on customers(first_name, age);
+explain analyze select first_name, age , count(*) from customers group by first_name, age;
+/*
+    -> Group aggregate: count(0)  (cost=397 rows=1829)
+        (actual time=0.0446..0.588 rows=1829 loops=1)
+    -> Covering index scan on customers using idx_customers_first_name_age  (cost=200 rows=1971)
+        (actual time=0.0367..0.326 rows=2000 loops=1)
+    -- first_nameとageの複合インデックスを作成することで、GROUP BYの処理が0.588秒まで大幅に短縮された。
+    -- インデックススキャンが有効に機能しており、パフォーマンス改善が確認できる。
+*/
+
+drop index idx_customers_first_name_age on customers;
+
+
+-- 外部キーに対してインデックスを適用し、JOINのパフォーマンスを検証。
+-- インデックスなしの状態では、結合処理に多くの時間がかかる。
+explain analyze select * from prefectures as pr
+inner join customers as ct
+on pr.prefecture_code = ct.prefecture_code and pr.name = "北海道";
+/*
+    -> Nested loop inner join  (cost=890 rows=197)
+        (actual time=9.46..9.46 rows=0 loops=1)
+    -> Filter: (ct.prefecture_code is not null)  (cost=200 rows=1971)
+        (actual time=0.0897..1.57 rows=2000 loops=1)
+    -> Table scan on ct  (cost=200 rows=1971)
+        (actual time=0.0885..1.4 rows=2000 loops=1)
+    -> Filter: (pr.`name` = '北海道')  (cost=0.25 rows=0.1)
+        (actual time=0.00384..0.00384 rows=0 loops=2000)
+    -> Single-row index lookup on pr using PRIMARY (prefecture_code=ct.prefecture_code)  (cost=0.25 rows=1)
+        (actual time=0.00359..0.00362 rows=1 loops=2000)
+    -- インデックスがないため、結合処理に多くの時間がかかっており、外部キーの結合が最適化されていない。
+    -- ネステッドループでの結合が行われ、各ループでテーブルスキャンが発生している。
+*/
+
+-- customersテーブルの外部キー（prefecture_code）にインデックスを追加して、JOIN処理のパフォーマンスを向上させる。
+create index idx_customers_prefecture_code on customers(prefecture_code);
+explain analyze select * from prefectures as pr
+inner join customers as ct
+on pr.prefecture_code = ct.prefecture_code and pr.name = "北海道";
+/*
+    -> Nested loop inner join  (cost=73.4 rows=226)
+        (actual time=5.52..5.52 rows=0 loops=1)
+    -> Filter: (pr.`name` = '北海道')  (cost=4.95 rows=4.7)
+        (actual time=5.52..5.52 rows=0 loops=1)
+    -> Table scan on pr  (cost=4.95 rows=47)
+        (actual time=5.5..5.51 rows=47 loops=1)
+    -> Index lookup on ct using idx_customers_prefecture_code (prefecture_code=pr.prefecture_code)  (cost=10.8 rows=48.1)
+        (never executed)
+    -- prefecture_codeにインデックスを追加したことで、結合時の処理が最適化されたが、
+    -- 依然として「北海道」という条件で絞り込んだ際のデータがないため、結果はrows=0。
+    -- ただし、インデックスを利用したネステッドループの効率が向上している。
+*/
+
+drop index idx_customers_prefecture_code on customers;
