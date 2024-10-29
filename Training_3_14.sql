@@ -218,3 +218,48 @@ INSERT INTO k_partition (name) VALUES
 
 -- パーティション p1 からのデータ選択
 SELECT * FROM k_partition PARTITION(p1);
+
+
+-- サブパーティションを使用した注文履歴テーブルの作成、データ挿入、クエリ実行、統計情報の更新を一括で行う
+
+-- テーブル作成
+CREATE TABLE order_history (
+    id INT,                 -- 注文ID
+    amount INT,             -- 注文金額
+    order_date DATE         -- 注文日
+)
+PARTITION BY RANGE (YEAR(order_date)) -- 注文日（年単位）でRANGEパーティションを作成
+SUBPARTITION BY HASH (id)             -- 各パーティション内でIDに基づきハッシュでサブパーティションを分割
+(
+    PARTITION p0 VALUES LESS THAN (2010) (  -- 2010年未満の注文を対象
+        SUBPARTITION s0,                     -- サブパーティションs0
+        SUBPARTITION s1                      -- サブパーティションs1
+    ),
+    PARTITION p1 VALUES LESS THAN (2015) (  -- 2010年から2014年までの注文を対象
+        SUBPARTITION s2,                     -- サブパーティションs2
+        SUBPARTITION s3                      -- サブパーティションs3
+    ),
+    PARTITION p2 VALUES LESS THAN (MAXVALUE) (  -- 2015年以降の注文を対象
+        SUBPARTITION s4,                         -- サブパーティションs4
+        SUBPARTITION s5                          -- サブパーティションs5
+    )
+);
+
+-- データの挿入
+INSERT INTO order_history VALUES
+(1, 10000, "2024-01-11"), -- 2024年1月11日の注文
+(2, 10000, "2024-01-20"), -- 2024年1月20日の注文
+(3, 10000, "2024-01-21"), -- 2024年1月21日の注文
+(4, 10000, "2022-01-01"), -- 2022年1月1日の注文
+(5, 10000, "2025-01-06"), -- 2025年1月6日の注文
+(6, 10000, "2024-01-01"), -- 2024年1月1日の注文
+(7, 10000, "2022-01-01"); -- 2022年1月1日の注文（重複データとしての例）
+
+-- 特定のサブパーティション（s1）からデータを取得
+SELECT * FROM order_history PARTITION (s1);
+
+-- 条件に基づき最適なパーティションやサブパーティションが利用されているか確認
+EXPLAIN SELECT * FROM order_history WHERE order_date < "2024-01-20"\G
+
+-- 統計情報の更新（パーティションs0のサブパーティション単位で実施）
+ALTER TABLE order_history ANALYZE PARTITION s0;
